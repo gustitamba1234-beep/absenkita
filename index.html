@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi Digital Kalender v3</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+
+    <script>
+      // Memaksa menghapus Service Worker lama agar tampilan baru WAJIB muncul
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    </script>
+
+    <style>
+        :root {
+            --accent: #4f46e5;
+            --accent-hover: #4338ca;
+            --accent-light: #f5f3ff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --danger: #ef4444;
+            --bg: #f1f5f9;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.02);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #e0e7ff 0%, var(--bg) 40%);
+            color: var(--text);
+            padding: 20px 16px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 540px;
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+
+        .app-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .app-logo {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin: 0 auto 10px auto;
+            display: block;
+        }
+
+        .app-header h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .app-header p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+        }
+
+        .meta-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .meta-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .meta-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: var(--surface);
+            outline: none;
+        }
+
+        /* PANEL PEMILIH BULAN & KALENDER BARU */
+        .calendar-panel {
+            background: #fdfdfd;
+            border: 2px solid var(--accent);
+            border-radius: var(--radius-lg);
+            padding: 14px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .calendar-header-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--accent);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            text-align: center;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .custom-select {
+            padding: 10px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            font-weight: 700;
+            font-size: 0.9rem;
+            background: #f8fafc;
+            color: var(--text);
+            outline: none;
+        }
+
+        /* Desain Grid Tanggal */
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            background: #f1f5f9;
+            padding: 8px;
+            border-radius: var(--radius-md);
+        }
+
+        .day-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 8px 0;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s ease;
+        }
+
+        .day-btn.active {
+            background: var(--accent) !important;
+            color: white !important;
+            border-color: var(--accent) !important;
+            box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
+        }
+
+        .day-btn.has-data {
+            background: #e0e7ff;
+            border-color: #a5b4fc;
+            color: var(--accent);
+        }
+
+        .student-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .student-card {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 12px;
+        }
+
+        .student-card.disabled-row { opacity: 0.5; }
+        .student-card.active-row { background: var(--surface); box-shadow: var(--shadow-sm); }
+
+        .student-name-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .badge-no {
+            font-size: 0.7rem;
+            font-weight: 800;
+            background: #e2e8f0;
+            color: var(--text-muted);
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .name-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 0.9rem;
+            font-weight: 700;
+            outline: none;
+            border-bottom: 2px dashed var(--border);
+        }
+
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .opt-btn {
+            padding: 8px 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--surface);
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .opt-btn[data-status="H"].active { background: #ecfdf5 !important; color: var(--success) !important; border-color: #a7f3d0 !important; }
+        .opt-btn[data-status="S"].active { background: #fffbeb !important; color: var(--warning) !important; border-color: #fde68a !important; }
+        .opt-btn[data-status="I"].active { background: #eff6ff !important; color: var(--info) !important; border-color: #bfdbfe !important; }
+        .opt-btn[data-status="A"].active { background: #fef2f2 !important; color: var(--danger) !important; border-color: #fca5a5 !important; }
+
+        .btn-main {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: var(--radius-lg);
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 8px;
+        }
+
+        .btn-save { background: var(--accent); color: white; }
+        .btn-excel { background: #059669; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- HEADER LOGO -->
+        <div class="app-header">
+            <img src="logo.png" class="app-logo" alt="Logo Sekolah" id="logoEl">
+            <h1>Absensi Kelas</h1>
+            <p>SMPN 219 Jakarta</p>
+        </div>
+
+        <!-- META DATA -->
+        <div class="meta-grid">
+            <div class="meta-field">
+                <label class="meta-label">Nama Guru/Wali kelas</label>
+                <input type="text" id="teacherInput" class="meta-input" placeholder="Nama Guru..." oninput="saveMeta()">
+            </div>
+            <div class="meta-field">
+                <label class="meta-label">Kelas</label>
+                <input type="text" id="classInput" class="meta-input" placeholder="Contoh: 10-A..." oninput="saveMeta()">
+            </div>
+        </div>
+
+        <!-- KALENDER UTAMA DAN PILIHAN BULAN (LANGSUNG DI DEPAN) -->
+        <div class="calendar-panel">
+            <div class="calendar-header-title">📅 Pilih Bulan & Tanggal Absen</div>
+            <div class="filter-row">
+                <!-- Dropdown Bulan Terintegrasi -->
+                <select id="monthSelect" class="custom-select" onchange="generateCalendarGrid()">
+                    <option value="01">Januari</option>
+                    <option value="02">Februari</option>
+                    <option value="03">Maret</option>
+                    <option value="04">April</option>
+                    <option value="05">Mei</option>
+                    <option value="06">Juni</option>
+                    <option value="07">Juli</option>
+                    <option value="08">Agustus</option>
+                    <option value="09">September</option>
+                    <option value="10">Oktober</option>
+                    <option value="11">November</option>
+                    <option value="12">Desember</option>
+                </select>
+                <!-- Pilihan Semester -->
+                <select id="semSelect" class="custom-select" onchange="generateCalendarGrid()">
+                    <option value="1">Semester 1</option>
+                    <option value="2">Semester 2</option>
+                </select>
+            </div>
+            <!-- Angka Kalender 1-31 Otomatis Menyesuaikan Bulan -->
+            <div class="days-grid" id="daysContainer"></div>
+        </div>
+
+        <div class="section-header" style="margin-bottom: 10px;">
+            <div class="section-title" style="font-weight: 800;">Siswa Aktif (36)</div>
+        </div>
+        
+        <!-- DAFTAR SISWA -->
+        <div class="student-list" id="listContainer"></div>
+
+        <!-- ACTION BUTTONS -->
+        <button class="btn-main btn-save" onclick="triggerSave()">💾 Simpan Kehadiran Hari Ini</button>
+        <button class="btn-main btn-excel" onclick="exportToExcelCalendar()">📊 Download Excel Bulanan (Format Kalender)</button>
+    </div>
+
+    <script>
+        const maxSiswa = 36;
+        let selectedDay = new Date().getDate(); // Tanggal default hari ini
+
+        let dbNames = JSON.parse(localStorage.getItem('min_names')) || {};
+        let dbRecords = JSON.parse(localStorage.getItem('min_records')) || { 1: {}, 2: {} };
+        let dbMeta = JSON.parse(localStorage.getItem('min_meta')) || { teacher: "", className: "" };
+
+        // Set nama default
+        if (Object.keys(dbNames).length === 0) {
+            for (let i = 1; i <= maxSiswa; i++) { dbNames[i] = ""; }
+            localStorage.setItem('min_names', JSON.stringify(dbNames));
+        }
+
+        // Set form default
+        document.getElementById('teacherInput').value = dbMeta.teacher || "";
+        document.getElementById('classInput').value = dbMeta.className || "";
+        
+        // Atur dropdown bulan bawaan sesuai bulan asli saat ini
+        const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+        document.getElementById('monthSelect').value = currentMonthStr;
+
+        function saveMeta() {
+            dbMeta.teacher = document.getElementById('teacherInput').value;
+            dbMeta.className = document.getElementById('classInput').value;
+            localStorage.setItem('min_meta', JSON.stringify(dbMeta));
+        }
+
+        // FUNGSI MEMBUAT ANGKA KALENDER YANG TERINTEGRASI DENGAN BULAN
+        function generateCalendarGrid() {
+            const container = document.getElementById('daysContainer');
+            container.innerHTML = '';
+            
+            const month = document.getElementById('monthSelect').value;
+            const sem = document.getElementById('semSelect').value;
+            const year = new Date().getFullYear();
+            
+            // Dapatkan jumlah hari di bulan terpilih
+            const totalDays = new Date(year, parseInt(month), 0).getDate();
+            
+            // Jaga agar tanggal terpilih tidak melompati batas hari maksimum bulan baru
+            if (selectedDay > totalDays) selectedDay = totalDays;
+
+            for (let d = 1; d <= totalDays; d++) {
+                const btn = document.createElement('button');
+                btn.className = 'day-btn';
+                btn.innerText = d;
+                
+                // Beri tanda warna jika tanggal tersebut sudah pernah diisi absen sebelumnya
+                const formattedDay = String(d).padStart(2, '0');
+                const dateKey = `${year}-${month}-${formattedDay}`;
+                if (dbRecords[sem] && dbRecords[sem][dateKey] && Object.keys(dbRecords[sem][dateKey]).length > 0) {
+                    btn.classList.add('has-data');
+                }
+
+                // Beri warna biru terang pada tanggal yang sedang aktif dipilih
+                if (d === selectedDay) {
+                    btn.classList.add('active');
+                }
+
+                btn.onclick = function() {
+                    selectedDay = d;
+                    document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    renderList();
+                };
+
+                container.appendChild(btn);
+            }
+            renderList();
+        }
+
+        function getCurrentDateKey() {
+            const year = new Date().getFullYear();
+            const month = document.getElementById('monthSelect').value;
+            const day = String(selectedDay).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function renderList() {
+            const container = document.getElementById('listContainer');
+            container.innerHTML = '';
+            
+            const sem = document.getElementById('semSelect').value;
+            const dateKey = getCurrentDateKey();
+            const dailyData = (dbRecords[sem] && dbRecords[sem][dateKey]) ? dbRecords[sem][dateKey] : {};
+
+            for (let i = 1; i <= maxSiswa; i++) {
+                const currentName = dbNames[i] || '';
+                const isNameEmpty = currentName.trim() === '';
+                const curStatus = isNameEmpty ? '' : (dailyData[i] || '');
+
+                const card = document.createElement('div');
+                card.className = `student-card ${isNameEmpty ? 'disabled-row' : 'active-row'}`;
+                card.id = `card-${i}`;
+                card.innerHTML = `
+                    <div class="student-name-row">
+                        <span class="badge-no">${i}</span>
+                        <input type="text" class="name-input" id="input-${i}" value="${currentName}" placeholder="Ketik nama siswa..." oninput="handleNameInput(${i}, this.value)">
+                    </div>
+                    <div class="option-grid">
+                        <button class="opt-btn ${curStatus === 'H' ? 'active' : ''}" data-status="H" ${isNameEmpty ? 'disabled' : ''} onclick="selectStatus(${i}, 'H', this)">Hadir</button>
+                        <button class="opt-btn ${curStatus === 'S' ? 'active' : ''}" data-status="S" ${isNameEmpty ? 'disabled' : ''} onclick="selectStatus(${i}, 'S', this)">Sakit</button>
+                        <button class="opt-btn ${curStatus === 'I' ? 'active' : ''}" data-status="I" ${isNameEmpty ? 'disabled' : ''} onclick="selectStatus(${i}, 'I', this)">Izin</button>
+                        <button class="opt-btn ${curStatus === 'A' ? 'active' : ''}" data-status="A" ${isNameEmpty ? 'disabled' : ''} onclick="selectStatus(${i}, 'A', this)">Alpha</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function handleNameInput(id, val) {
+            dbNames[id] = val.trim();
+            localStorage.setItem('min_names', JSON.stringify(dbNames));
+            
+            // Muat ulang tanpa menghilangkan fokus ketikan
+            const card = document.getElementById(`card-${id}`);
+            const buttons = card.querySelectorAll('.opt-btn');
+            if (val.trim() === '') {
+                card.className = 'student-card disabled-row';
+                buttons.forEach(b => { b.disabled = true; b.classList.remove('active'); });
+                const sem = document.getElementById('semSelect').value;
+                const dateKey = getCurrentDateKey();
+                if(dbRecords[sem] && dbRecords[sem][dateKey]) delete dbRecords[sem][dateKey][id];
+            } else {
+                card.className = 'student-card active-row';
+                buttons.forEach(b => b.disabled = false);
+            }
+        }
+
+        function selectStatus(siswaId, status, btn) {
+            const sem = document.getElementById('semSelect').value;
+            const dateKey = getCurrentDateKey();
+            const grid = btn.parentElement;
+
+            if(!dbRecords[sem]) dbRecords[sem] = {};
+            if(!dbRecords[sem][dateKey]) dbRecords[sem][dateKey] = {};
+
+            if (dbRecords[sem][dateKey][siswaId] === status) {
+                delete dbRecords[sem][dateKey][siswaId];
+                btn.classList.remove('active');
+            } else {
+                grid.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                dbRecords[sem][dateKey][siswaId] = status;
+            }
+        }
+
+        function triggerSave() {
+            localStorage.setItem('min_records', JSON.stringify(dbRecords));
+            saveMeta();
+            alert('✅ Absensi tanggal ' + selectedDay + ' berhasil disimpan!');
+            generateCalendarGrid(); // Refresh indikator warna kalender
+        }
+
+        // LOGIKA DOWNLOAD EXCEL KALENDER BULANAN (MENYESUAIKAN BULAN DI MENU)
+        function exportToExcelCalendar() {
+            saveMeta();
+            const month = document.getElementById('monthSelect').value;
+            const monthText = document.getElementById('monthSelect').options[document.getElementById('monthSelect').selectedIndex].text;
+            const sem = document.getElementById('semSelect').value;
+            const year = new Date().getFullYear();
+            
+            const totalDaysInMonth = new Date(year, parseInt(month), 0).getDate();
+            const pool = dbRecords[sem] || {};
+
+            let csvStr = "\uFEFF"; // BOM Agar terbaca Excel secara otomatis dan rapi
+            
+            // Baris Judul Laporan Excel
+            csvStr += `LAPORAN REKAPITULASI ABSENSI BULANAN - ${monthText.toUpperCase()} ${year}\n`;
+            csvStr += `Nama Guru,${dbMeta.teacher || "-"}\n`;
+            csvStr += `Kelas,${dbMeta.className || "-"}\n`;
+            csvStr += `Semester,${sem}\n\n`;
+            
+            // Bikin Kolom Tanggal Horizontal 1 sampai 28/30/31 di Excel
+            let headerRow = "No,Nama Siswa";
+            for (let d = 1; d <= totalDaysInMonth; d++) {
+                headerRow += `,${d}`;
+            }
+            headerRow += ",Total H,Total S,Total I,Total A\n";
+            csvStr += headerRow;
+            
+            // Masukkan data siswa secara horizontal sesuai tanggal kalender
+            let totalSiswaDiekspor = 0;
+            for (let i = 1; i <= maxSiswa; i++) {
+                if (dbNames[i] && dbNames[i].trim() !== "") {
+                    let rowStr = `${i},"${dbNames[i]}"`;
+                    let cH = 0, cS = 0, cI = 0, cA = 0;
+
+                    for (let day = 1; day <= totalDaysInMonth; day++) {
+                        const dateKey = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                        const status = (pool[dateKey] && pool[dateKey][i]) ? pool[dateKey][i] : "";
+                        
+                        rowStr += `,${status}`;
+
+                        if (status === "H") cH++;
+                        if (status === "S") cS++;
+                        if (status === "I") cI++;
+                        if (status === "A") cA++;
+                    }
+
+                    rowStr += `,${cH},${cS},${cI},${cA}\n`;
+                    csvStr += rowStr;
+                    totalSiswaDiekspor++;
+                }
+            }
+
+            if (totalSiswaDiekspor === 0) {
+                alert("⚠️ Masukkan minimal satu nama siswa terlebih dahulu.");
+                return;
+            }
+
+            // Eksekusi download file csv/excel
+            const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
+            const dlLink = document.createElement("a");
+            dlLink.href = URL.createObjectURL(blob);
+            dlLink.setAttribute("download", `Rekap_${monthText}_Kelas_${(dbMeta.className || "Kelas").replace(/[^a-zA-Z0-9]/g, "_")}.csv`);
+            document.body.appendChild(dlLink);
+            dlLink.click();
+            document.body.removeChild(dlLink);
+        }
+
+        // Jalankan kalender pertama kali dibuka
+        generateCalendarGrid();
+    </script>
+</body>
+</html>
